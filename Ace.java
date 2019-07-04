@@ -1,12 +1,17 @@
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 
 class Ace {
 
 	private static JFrame frame;
 	private JPanel panel1;
 	private Screen display;
+
+	Timer timer;                //timer to execute opcodes at a constant rate
+	ActionListener taskPerformer;
 
 	public Ace() {
 
@@ -57,27 +62,39 @@ class Ace {
 	}
 
 	public void start() {
-		
-		byte[] cls = {(byte) 0x00, (byte) 0xe0};
+
 		byte[] setv0 = {(byte) 0x60, (byte) 0x04};
 		byte[] setv1 = {(byte) 0x61, (byte) 0x1f};
 		byte[] setv2 = {(byte) 0x62, (byte) 0x0f};
 		byte[] setI = {(byte) 0xf0, (byte) 0x29};
 		byte[] drw = {(byte) 0xd1, (byte) 0x25};
-		
-		short p = (short) 0xff00;
 
-		Chip8 c8 = new Chip8();		//set up the chip8 emulator instance
+		Chip8 c8 = new Chip8();        //set up the chip8 emulator instance
 
-		display.setInstance(c8);	//let the display JComponent access the chip8 instance
-		
-		//c8.runOpcode(cls);
-		c8.runOpcode(setv0);
-		c8.runOpcode(setv1);
-		c8.runOpcode(setv2);
-		c8.runOpcode(setI);
-		c8.runOpcode(drw);
+		display.setInstance(c8);    //let the display JComponent access the chip8 instance
+
 		c8.loadRom("Fishie.ch8");
+
+		taskPerformer = new ActionListener() {
+
+			@Override
+			public void actionPerformed(ActionEvent evt) {
+
+				if (c8.clock == true) {
+
+					c8.runOpcode();
+
+				} else {
+
+					//stop chip8 clock from running
+					timer.stop();
+				}
+			}
+		};
+
+		timer = new Timer(2, taskPerformer);
+
+		timer.start();
 
 	}
 
@@ -97,14 +114,13 @@ class Ace {
 	 */
 	private void $$$setupUI$$$() {
 		panel1 = new JPanel();
-		panel1.setLayout(new GridBagLayout());
+		panel1.setLayout(new BorderLayout(0, 0));
 		display = new Screen();
 		display.setBackground(new Color(-13355980));
-		GridBagConstraints gbc;
-		gbc = new GridBagConstraints();
-		gbc.gridx = 0;
-		gbc.gridy = 0;
-		panel1.add(display, gbc);
+		panel1.add(display, BorderLayout.CENTER);
+		final JPanel panel2 = new JPanel();
+		panel2.setLayout(new GridBagLayout());
+		panel1.add(panel2, BorderLayout.NORTH);
 	}
 
 	/**

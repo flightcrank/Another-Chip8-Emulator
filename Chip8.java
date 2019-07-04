@@ -1,22 +1,25 @@
 
 import java.io.*;
 import java.util.Arrays;
+import java.util.Random;
 
 class Chip8 {
 	
 	byte sys_mem[] = new byte[4096]; //array of 4k chip8 system memory
-	byte vReg[] = new byte[16];	 //16 8 bit general purpose registers
-	short iReg;			 //1 16 bit address register
-	short sP;			 //1 16 bit stack pointer register
-	short pC;			 //1 16bit program counter register
+	int vReg[] = new int[16];	 //16 8 bit general purpose registers
+	int iReg;			 //1 16 bit address register
+	int sP;				 //1 16 bit stack pointer register
+	int pC;				 //1 16bit program counter register
 	byte delayTimer;		 //1 8 bit delay timer register
 	byte soundTimer;		 //1 8 bit sound timer register
+	boolean clock;
 	final byte I = 0x10;			
 
 	public Chip8() {
 		
 		//initilise system registers and load system font
-		
+		clock = true;
+
 		//stack pointer index
 		sP = 0xea0;
 		
@@ -40,7 +43,6 @@ class Chip8 {
 	}
 	
 	public void clearScreen() {
-		
 
 		Arrays.fill(sys_mem, 0xf00, 0xfff, (byte) 0);
 	}
@@ -50,12 +52,33 @@ class Chip8 {
 		//set the I register
 		if (index == I) {
 			
-			iReg = (short) (vReg[val] * 5);
+			iReg = vReg[val] * 5;
 		
 		//set the V register to val at the index location
 		} else {
 			
 			vReg[index] = val;
+		}
+	}
+
+	public void setReg(int xIndex, int yIndex, int code) {
+		
+		if (code == 0x00) {
+			
+			vReg[xIndex] = vReg[yIndex];
+		
+		} else if (code == 0x01) { // AND
+			
+			vReg[xIndex] |= vReg[yIndex];
+
+		} else if (code == 0x02) { //OR
+			
+			vReg[xIndex] &= vReg[yIndex];
+		
+		} else if (code == 0x03) { //XOR
+			
+			vReg[xIndex] ^= vReg[yIndex];
+		
 		}
 	}
 
@@ -94,8 +117,11 @@ class Chip8 {
 		//TODO set register VF to 0 or 1 if any bits were changed
 	}
 
-	public void runOpcode(byte opcode[]) {
+	//public void runOpcode(byte opcode[]) {
+	public void runOpcode() {
 		
+		byte opcode[] = {sys_mem[pC], sys_mem[pC + 1]};
+
 		//convert opcode bytes to ints as java has no unsigned bytes
 		int highByte = 0x000000ff & opcode[0];
 		int lowByte = 0x000000ff & opcode[1];
@@ -118,98 +144,221 @@ class Chip8 {
 					
 					System.out.println("CLS");
 					clearScreen();
+					pC += 2;
 
 				} else if (highByte == 0x00 && lowByte == 0xee) {
 
 					System.out.println("RET");
+					pC = sP;
 
-				} else if (highByte == 0x00) {
+					if (sP > 0xea0) { 
+
+						sP--;
+					}
+
+				} else if (highByte == 0x00 && lowByte != 0x00) {
 
 					System.out.printf("CAL &%x%n", address);
 				
 				} else {
 				
-					System.out.printf("NOP%n"); 
+					System.out.printf("NOP%n");
+					clock = false;
 				}
 			break;
 			
-			case 0x01: System.out.printf("JMP &%x%n", address); break;
+			case 0x01: 
+				
+				System.out.printf("JMP &%x%n", address); 
+				pC = address;
+				break;
 
-			case 0x02: System.out.printf("SUB &%x%n", address); break;
+			case 0x02: 
+				
+				System.out.printf("SUB &%x%n", address); 
+			
+				//store current pC in the stack space
+				byte b1 = (byte) ((0x0000ff00 & pC) >> 8);
+				byte b2 = (byte) (0x000000ff & pC);
+				
+				sys_mem[sP] = (byte) b1;
+				sys_mem[sP + 1] = (byte) b2;
+				
+				//jump to address
+				pC = address;
 
-			case 0x03: System.out.printf("SKP V%x == %x%n", vx, lowByte); break;
+				break;
 
-			case 0x04: System.out.printf("SKP V%x != %x%n", vx, lowByte); break;
+			case 0x03: 
+				
+				System.out.printf("SKP V%x == %x%n", vx, lowByte); 
+				
+				if (vReg[vx] == lowByte) {
+					
+					pC += 4;
 
-			case 0x05: System.out.printf("SKP V%x == V%x%n", vx, vy); break;
+				} else {
+				
+					pC += 2;
+				}
+
+				break;
+
+			case 0x04: 
+				
+				System.out.printf("SKP V%x != %x%n", vx, lowByte); 
+				
+				if (vReg[vx] != lowByte) {
+					
+					pC += 4;
+
+				} else {
+				
+					pC += 2;
+				}
+				
+				break;
+
+			case 0x05:
+
+				System.out.printf("SKP V%x == V%x%n", vx, vy); 
+				
+				if (vReg[vx] == vReg[vy]) {
+					
+					pC += 4;
+
+				} else {
+				
+					pC += 2;
+				}
+				
+				break;
 
 			case 0x06: 
 				
 				System.out.printf("SET V%x = %x%n", vx, lowByte); 
 				setReg((byte) vx, (byte) lowByte);
+				pC += 2;
 			break;
 
-			case 0x07: System.out.printf("ADD V%x += %x%n", vx, lowByte); break;
+			case 0x07: System.out.printf("ADD V%x += %x%n", vx, lowByte); 
+				
+				vReg[vx] = vReg[vx] + lowByte;
+				pC += 2;
+			break;
 
 			case 0x08: 
 
 				if (lowCode == 0x00) {
 					
-					System.out.printf("SET V%x = V%x%n", vx, vy); 
+					System.out.printf("SET V%x = V%x%n", vx, vy);
+					setReg(vx, vy, lowCode);
+					pC += 2;
 				
 				} else if (lowCode == 0x01) {
 					
 					System.out.printf("OR V%x = V%x | V%x%n", vx, vx, vy); 
+					setReg(vx, vy, lowCode);
+					pC += 2;
 				
 				} else if (lowCode == 0x02) {
 					
 					System.out.printf("AND V%x = V%x & V%x%n", vx, vx, vy); 
+					setReg(vx, vy, lowCode);
+					pC += 2;
 				
 				} else if (lowCode == 0x03) {
 					
 					System.out.printf("XOR V%x = V%x ^ V%x%n", vx, vx, vy); 
+					setReg(vx, vy, lowCode);
+					pC += 2;
 
 				} else if (lowCode == 0x04) {
 					
-					System.out.printf("ADD V%x += V%x%n", vx, vy); 
+					//TODO implement wrapping of vx if the value added makes vx lager than 0xFF and set VF if there is a carry
+					System.out.printf("ADD V%x += V%x%n", vx, vy);
+					vReg[vx] = vReg[vx] + vReg[vy];
+					pC += 2;
 
 				} else if (lowCode == 0x05) {
 					
+					//TODO set VF if borrow
 					System.out.printf("SUB V%x -= V%x%n", vx, vy); 
+					vReg[vx] = vReg[vx] - vReg[vy];
+					pC += 2;
 
 				} else if (lowCode == 0x06) {
 					
-					System.out.printf("SET V%x = V%x >> 1%n", vx, vx); 
+					//TODO set VF to LSB
+					System.out.printf("SET V%x = V%x >> 1%n", vx, vx);
+					vReg[vx]  = vReg[vy] >> 1;
+					pC += 2;
 
 				} else if (lowCode == 0x07) {
 					
-					System.out.printf("SET V%x = V%x - V%x%n", vx, vy, vx); 
+					//TODO set VF if borrow
+					System.out.printf("SET V%x = V%x - V%x%n", vx, vy, vx);
+					vReg[vx] = vReg[vy] - vReg[vx];
+					pC += 2;
 				
 				} else if (lowCode == 0x0e) {
 					
-					System.out.printf("SET V%x = V%x << 1%n", vx, vx); 
+					//TODO set VF to MSB
+					System.out.printf("SET V%x = V%x << 1%n", vx, vy);
+					vReg[vx]  = vReg[vy] << 1;
+					pC += 2;
+
 				} else {
 				
 					System.out.printf("NOP%n"); 
 				}
 
+				break;
 
-			break;
+			case 0x09: 
+				
+				System.out.printf("SKP V%x != V%x%n", vx, vy); 
+				
+				if (vReg[vx] != vReg[vy]) {
+					
+					pC += 4;
 
-			case 0x09: System.out.printf("SKP V%x != V%x%n", vx, vy); break;
+				} else {
+				
+					pC += 2;
+				}
 
-			case 0x0a: System.out.printf("SET I = &%x%n", address); break;
+				break;
 
-			case 0x0b: System.out.printf("JMP &%x + V0%n", address); break;
+			case 0x0a: 
+				
+				System.out.printf("SET I = &%x%n", address); 
+				iReg = address;
+				pC += 2;
+				
+				break;
+
+			case 0x0b: 
+
+				System.out.printf("JMP &%x + V0%n", address); 
+				pC = address + vReg[0];
+				break;
 			
-			case 0x0c: System.out.printf("SET V%x = V%x & ?%n", vx, vx); break;
+			case 0x0c: 
+				
+				System.out.printf("SET V%x = V%x & ?%n", vx, vx); 
+				vReg[vx] = new Random().nextInt() & lowByte; 
+				pC += 2;
+
+				break;
 
 			case 0x0d: 
 				
 				System.out.printf("DRW %x %x %x%n", vReg[vx], vReg[vy], lowCode); 
 				drawSprite(vReg[vx], vReg[vy], lowCode);
+				pC += 2;
 
-			break;
+				break;
 
 			case 0x0e: 
 				
@@ -247,12 +396,15 @@ class Chip8 {
 				
 				} else if (lowByte == 0x1e) {
 					
-					System.out.printf("ADD I +=  V%x%n", vx); 
+					System.out.printf("ADD I +=  V%x%n", vx);
+					iReg += vReg[vx];
+					pC += 2;
 				
 				} else if (lowByte == 0x29) {
 				
 					System.out.printf("SET I = & of V%x%n", vx);
 					setReg(I, (byte) vx);
+					pC += 2;
 
 				} else if (lowByte == 0x33) {
 					
@@ -283,7 +435,7 @@ class Chip8 {
 	public void loadRom(String fileName) {
 		
 		int size;
-		byte opcode[] = new byte[2];
+		int count = 0;
 
 		// Use try-with-resources to close the stream.
 		try (FileInputStream file = new FileInputStream(fileName)) {
@@ -291,11 +443,11 @@ class Chip8 {
 			size = file.available();
 			System.out.println("file size = " + size);
 
-			while (file.available() > 1) {
+			while (file.available() > 0) {
 				
-				file.read(opcode);
-				//OperationCode(opcode);
-				//System.out.printf("%02x%n", opcode[0]);
+				byte b = (byte) file.read();
+				sys_mem[0x200 + count] = b;
+				count++;
 			}
 
 		} catch (IOException e) {
