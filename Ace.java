@@ -13,9 +13,7 @@ class Ace {
 	Timer timer;                //timer to execute opcodes at a constant rate
 	ActionListener taskPerformer;
 
-	public Ace() {
-
-		display.pixelBuffer[0] = (byte) 0x80;
+	public Ace(String fileName) {
 
 		//set up the program window frame
 		frame = new JFrame("ACE (Another Chip-8 Emulator)");
@@ -26,7 +24,7 @@ class Ace {
 		frame.setLocationRelativeTo(null);
 		frame.setVisible(true);
 
-		start();
+		start(fileName);
 	}
 
 	public static void main(String args[]) {
@@ -55,25 +53,19 @@ class Ace {
 				}
 
 				//create and show the Swing GUI and create the chip 8 instance
-				new Ace();
+				Ace emulator = new Ace(args[0]);
 			}
 		});
 
 	}
 
-	public void start() {
+	public void start(String fileName) {
 
-		byte[] setv0 = {(byte) 0x60, (byte) 0x04};
-		byte[] setv1 = {(byte) 0x61, (byte) 0x1f};
-		byte[] setv2 = {(byte) 0x62, (byte) 0x0f};
-		byte[] setI = {(byte) 0xf0, (byte) 0x29};
-		byte[] drw = {(byte) 0xd1, (byte) 0x25};
-
-		Chip8 c8 = new Chip8();        //set up the chip8 emulator instance
+		Chip8 c8 = new Chip8();     //set up the chip8 emulator instance
 
 		display.setInstance(c8);    //let the display JComponent access the chip8 instance
 
-		c8.loadRom("Fishie.ch8");
+		c8.loadRom(fileName);
 
 		taskPerformer = new ActionListener() {
 
@@ -82,8 +74,14 @@ class Ace {
 
 				if (c8.clock == true) {
 
-					c8.runOpcode();
-
+					int op = c8.runOpcode();
+					
+					//if a draw call was issued repaint the screen JComponent to reflect the changes to the screen bufffer
+					if (op == 0x0d) {
+						
+						display.repaint();
+					}
+					
 				} else {
 
 					//stop chip8 clock from running
@@ -92,10 +90,9 @@ class Ace {
 			}
 		};
 
-		timer = new Timer(2, taskPerformer);
-
+		timer = new Timer(22, taskPerformer);
 		timer.start();
-
+			
 	}
 
 	{
