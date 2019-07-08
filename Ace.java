@@ -90,7 +90,7 @@ class Ace {
 			}
 		};
 
-		timer = new Timer(22, taskPerformer);
+		timer = new Timer(2, taskPerformer);
 		timer.start();
 			
 	}
