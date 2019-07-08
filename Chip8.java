@@ -44,7 +44,6 @@ class Chip8 {
 		int xShift = 8 - ((xByte + 1) * 8 - x);
 
 		int yOffset = 0;
-
 		int pixel = 0;
 
 		//fill the screen buffer portion of system memory with the byte data of the sprite
@@ -63,7 +62,7 @@ class Chip8 {
 	
 			sys_mem[0xf00 + byteOffset] ^= b1;
 			sys_mem[0xf00 + byteOffset + 1] ^= b2;
-			yOffset += 8;
+			yOffset += width;
 		}
 
 		//TODO set register VF to 0 or 1 if any bits were changed
@@ -120,7 +119,7 @@ class Chip8 {
 					System.out.printf("NOP%n");
 					clock = false;
 				}
-			break;
+				break;
 			
 			case 0x01: 
 				
@@ -143,52 +142,27 @@ class Chip8 {
 				
 				//jump to address
 				pC = address;
-
 				break;
 
 			case 0x03: 
 				
 				System.out.printf("SKP V%x == %x%n", vx, lowByte); 
-				
-				if (vReg[vx] == lowByte) {
-					
-					pC += 4;
-
-				} else {
-				
-					pC += 2;
-				}
-
+				int res = ((byte)vReg[vx] == (byte)lowByte) ? 4 : 2;
+				pC += res;
 				break;
 
 			case 0x04: 
 				
 				System.out.printf("SKP V%x != %x%n", vx, lowByte); 
-				
-				if ((byte)vReg[vx] != (byte)lowByte) {
-					
-					pC += 4;
-
-				} else {
-				
-					pC += 2;
-				}
-				
+				res = ((byte)vReg[vx] != (byte)lowByte) ? 4 : 2;
+				pC += res;
 				break;
 
 			case 0x05:
 
 				System.out.printf("SKP V%x == V%x%n", vx, vy); 
-				
-				if (vReg[vx] == vReg[vy]) {
-					
-					pC += 4;
-
-				} else {
-				
-					pC += 2;
-				}
-				
+				res = ((byte)vReg[vx] == (byte)vReg[vy]) ? 4 : 2;
+				pC += res;
 				break;
 
 			case 0x06: 
@@ -196,15 +170,14 @@ class Chip8 {
 				System.out.printf("SET V%x = %x%n", vx, lowByte);
 				vReg[vx] = (byte) lowByte;
 				pC += 2;
-			break;
+				break;
 
 			case 0x07: 
 				
 				System.out.printf("ADD V%x += %x%n", vx, lowByte); 
 				vReg[vx] = (byte)(vReg[vx] + lowByte);
 				pC += 2;
-
-			break;
+				break;
 
 			case 0x08: 
 
@@ -278,24 +251,15 @@ class Chip8 {
 			case 0x09: 
 				
 				System.out.printf("SKP V%x != V%x%n", vx, vy); 
-				
-				if (vReg[vx] != vReg[vy]) {
-					
-					pC += 4;
-
-				} else {
-				
-					pC += 2;
-				}
-
+				res = ((byte)vReg[vx] != (byte)vReg[vy]) ? 4 : 2;
+				pC += res;
 				break;
 
 			case 0x0a: 
 				
 				System.out.printf("SET I = &%x%n", address); 
 				iReg = address;
-				pC += 2;
-				
+				pC += 2;		
 				break;
 
 			case 0x0b: 
@@ -309,7 +273,6 @@ class Chip8 {
 				System.out.printf("SET V%x = V%x & ?%n", vx, vx); 
 				vReg[vx] = new Random().nextInt() & lowByte; 
 				pC += 2;
-
 				break;
 
 			case 0x0d: 
@@ -317,7 +280,6 @@ class Chip8 {
 				System.out.printf("DRW %x %x %x%n", vReg[vx], vReg[vy], lowCode); 
 				drawSprite(vReg[vx], vReg[vy], lowCode);
 				pC += 2;
-
 				break;
 
 			case 0x0e: 
@@ -334,7 +296,7 @@ class Chip8 {
 				
 					System.out.printf("NOP%n"); 
 				}
-			break;
+				break;
 
 			case 0x0f: 
 				
@@ -363,31 +325,54 @@ class Chip8 {
 				} else if (lowByte == 0x29) {
 				
 					System.out.printf("SET I = & of V%x%n", vx);
-					iReg = (byte) vReg[vx];
+					iReg = vReg[vx] * 5;
 					pC += 2;
 
 				} else if (lowByte == 0x33) {
 					
-					System.out.printf("BCD V%x%n", vx); 
+					System.out.printf("BCD V%x%n", vx);
+					int num = 0x000000ff & vReg[vx];
+					int ones = num % 10;
+					int tens = num / 10 % 10;
+					int hundreds = num / 100;
+					sys_mem[iReg] = (byte) hundreds;
+					sys_mem[iReg + 1] = (byte) tens;
+					sys_mem[iReg + 2] = (byte) ones;
+					pC += 2;
 				
 				} else if (lowByte == 0x55) {
 					
-					System.out.printf("DMP V0 - V%x%n", vx); 
+					System.out.printf("DMP V0 - V%x%n", vx);
+					
+					for (int i = 0; i <= vx; i++) {
+						
+						sys_mem[iReg + i] = (byte) vReg[i];
+					}
+					
+					iReg = iReg + vx + 1;
+					pC += 2;
 				
 				} else if (lowByte == 0x65) {
 				
 					System.out.printf("LOD V0 - V%x%n", vx); 
+					
+					for (int i = 0; i <= vx; i++) {
+						
+						vReg[i] = sys_mem[iReg + i];
+					}
+					
+					iReg = iReg + vx + 1;
+					pC += 2;
 				
 				} else {
 				
 					System.out.printf("NOP%n"); 
 				}
-
-			break;
+				break;
 
 			default:
 				System.out.printf("Invalid Opcode%n"); 
-			break;
+				break;
 		}
 
 		return highCode;
