@@ -139,14 +139,14 @@ class Chip8 {
 				} else if (highByte == 0x00 && lowByte == 0xee) {
 
 					System.out.println("RET");
-					int b1 = sys_mem[sP] << 8;
+					int b1 = (0x0ff & sys_mem[sP]) << 8;
 					int b2 = 0x000000ff & sys_mem[sP + 1];
 					pC = b1;
 					pC = b1 | b2;
 
-					if (sP > 0xea0) { 
+					if (sP != 0xea0) { 
 
-						sP--;
+						sP -= 2;
 					}
 
 				} else if (highByte == 0x00 && lowByte != 0x00) {
@@ -174,12 +174,18 @@ class Chip8 {
 				
 				int next = pC + 2;
 
+				//if the stack pointer is non zero it must be pointing to some address already
+				//so advance the stack pointer. if it points to 2 zero bytes, it must be in the
+				// starting position 0xea0. no need to advance it in that case
+				int nsp = (sys_mem[sP] == 0 && sys_mem[sP + 1] == 0) ? 0 : 2;
+				sP += nsp;
+
 				//store current pC in the stack space
 				byte b1 = (byte) ((0x0000ff00 & next) >> 8);
 				byte b2 = (byte) (0x000000ff & next);
 				
-				sys_mem[sP] = (byte) b1;
-				sys_mem[sP + 1] = (byte) b2;
+				sys_mem[sP] = b1;
+				sys_mem[sP + 1] = b2;
 				
 				//jump to address
 				pC = address;
