@@ -12,6 +12,14 @@ Things left to implement are
 * sound
 * timer delay
 
+input keys are
+1234
+qwer
+asdf
+zxcv
+
+which map to 0x0 - 0xF
+
 Its currently still under active development.
 
 Compilation instructions are as follows...
