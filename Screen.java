@@ -17,7 +17,7 @@ public class Screen extends JComponent {
 		this.h = 32 * 10;
 		
 		setPreferredSize(new Dimension(w, h));
-		setDoubleBuffered(true);
+		//setDoubleBuffered(true);
 	}
 	
 	//set the chip8 emulator intstace so this JComponent can access the screenbuffer portion of system memory to display.

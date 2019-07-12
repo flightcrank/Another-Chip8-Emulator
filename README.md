@@ -8,7 +8,6 @@ of some games like space invaders
 Things left to implement are
 
 * sprite screen wrapping
-* key board input to play the game roms
 * rom compatibility
 * sound
 * timer delay

@@ -15,9 +15,14 @@ class Chip8 {
 	byte delayTimer;		 //1 8 bit delay timer register
 	byte soundTimer;		 //1 8 bit sound timer register
 	boolean clock;
-	final byte I = 0x10;			
 
 	public Chip8() {
+		
+		//initialise the chip system
+		initSystem();
+	}
+	
+	public void initSystem() {
 		
 		//initilise system registers and load system font
 		clock = true;
@@ -27,10 +32,30 @@ class Chip8 {
 		
 		//Program Counter index
 		pC = 0x200;
-
+		
+		//general purpose registers
+		Arrays.fill(vReg, 0, vReg.length, 0);
+		
+		//system memory  purpose registers
+		Arrays.fill(sys_mem, 0, sys_mem.length,(byte) 0);
+		
 		loadSystemFont();
 	}
 	
+	public void timerCountdown() {
+		
+		if (delayTimer > 0) {
+			
+			delayTimer--;
+		}
+		
+		if (soundTimer > 0) {
+			
+			soundTimer--;
+		}
+
+	}
+
 	//TODO implements screen wrapping in x and y(?)
 	public void drawSprite(int x, int y, int data) {
 		
@@ -61,8 +86,8 @@ class Chip8 {
 			int byteOffset1 = offset + yOffset; 
 			int byteOffset2 = (offset + yOffset + 1) % 256;
 			
-
-			byte res1 = (byte) (sys_mem[0xf00 + byteOffset1] ^ b1);
+			//store the result of the draw operation
+			byte res1 = (byte) (sys_mem[0xf00 + byteOffset1] ^ b1); 
 			byte res2 = (byte) (sys_mem[0xf00 + byteOffset2] ^ b2);
 			
 			//detect if any bits have changed
@@ -74,16 +99,16 @@ class Chip8 {
 				unset++;
 			}
 
+			//draw the result to the actual screen buffer
 			sys_mem[0xf00 + byteOffset1] = res1;
 			sys_mem[0xf00 + byteOffset2] = res2;
 			yOffset += width;
 		}
 		
 		vReg[15] = unset > 0 ? 0x1 : 0x0;
-		//TODO set register VF to 0 or 1 if any bits were changed
 	}
 
-	public int runOpcode() {
+	public int runOpcode(int key) {
 		
 		byte opcode[] = {sys_mem[pC], sys_mem[pC + 1]};
 
@@ -107,13 +132,13 @@ class Chip8 {
 				
 				if (highByte == 0x00 && lowByte == 0xe0) {
 					
-					//System.out.println("CLS");
+					System.out.println("CLS");
 					Arrays.fill(sys_mem, 0xf00, 0xfff, (byte) 0);
 					pC += 2;
 
 				} else if (highByte == 0x00 && lowByte == 0xee) {
 
-					//System.out.println("RET");
+					System.out.println("RET");
 					int b1 = sys_mem[sP] << 8;
 					int b2 = 0x000000ff & sys_mem[sP + 1];
 					pC = b1;
@@ -125,8 +150,10 @@ class Chip8 {
 					}
 
 				} else if (highByte == 0x00 && lowByte != 0x00) {
-
+					
+					//cpu machine code instruction, no roms really use this. emulator will stop
 					System.out.printf("CAL &%x%n", address);
+					clock = false;
 				
 				} else {
 				
@@ -137,13 +164,13 @@ class Chip8 {
 			
 			case 0x01: 
 				
-				//System.out.printf("JMP &%x%n", address); 
+				System.out.printf("JMP &%x%n", address); 
 				pC = address;
 				break;
 
 			case 0x02: 
 				
-				//System.out.printf("SUB &%x%n", address); 
+				System.out.printf("SUB &%x%n", address); 
 				
 				int next = pC + 2;
 
@@ -160,36 +187,36 @@ class Chip8 {
 
 			case 0x03: 
 				
-				//System.out.printf("SKP V%x == %x%n", vx, lowByte); 
+				System.out.printf("SKP V%x == %x%n", vx, lowByte); 
 				int res = ((byte)vReg[vx] == (byte)lowByte) ? 4 : 2;
 				pC += res;
 				break;
 
 			case 0x04: 
 				
-				//System.out.printf("SKP V%x != %x%n", vx, lowByte); 
+				System.out.printf("SKP V%x != %x%n", vx, lowByte); 
 				res = ((byte)vReg[vx] != (byte)lowByte) ? 4 : 2;
 				pC += res;
 				break;
 
 			case 0x05:
 
-				//System.out.printf("SKP V%x == V%x%n", vx, vy); 
+				System.out.printf("SKP V%x == V%x%n", vx, vy); 
 				res = ((byte)vReg[vx] == (byte)vReg[vy]) ? 4 : 2;
 				pC += res;
 				break;
 
 			case 0x06: 
 				
-				//System.out.printf("SET V%x = %x%n", vx, lowByte);
+				System.out.printf("SET V%x = %x%n", vx, lowByte);
 				vReg[vx] = (byte) lowByte;
 				pC += 2;
 				break;
 
 			case 0x07: 
 				
-				//System.out.printf("ADD V%x += %x%n", vx, lowByte); 
-				vReg[vx] = (byte)(vReg[vx] + lowByte);
+				System.out.printf("ADD V%x += %x%n", vx, lowByte); 
+				vReg[vx] = 0x0ff & (vReg[vx] + lowByte);
 				pC += 2;
 				break;
 
@@ -197,45 +224,45 @@ class Chip8 {
 
 				if (lowCode == 0x00) {
 					
-					//System.out.printf("SET V%x = V%x%n", vx, vy);
+					System.out.printf("SET V%x = V%x%n", vx, vy);
 					vReg[vx] = (byte) vReg[vy];
 					pC += 2;
 				
 				} else if (lowCode == 0x01) {
 					
-					//System.out.printf("OR V%x = V%x | V%x%n", vx, vx, vy); 
+					System.out.printf("OR V%x = V%x | V%x%n", vx, vx, vy); 
 					vReg[vx] |= vReg[vy];
 					pC += 2;
 				
 				} else if (lowCode == 0x02) {
 					
-					//System.out.printf("AND V%x = V%x & V%x%n", vx, vx, vy); 
+					System.out.printf("AND V%x = V%x & V%x%n", vx, vx, vy); 
 					vReg[vx] &= vReg[vy];
 					pC += 2;
 				
 				} else if (lowCode == 0x03) {
 					
-					//System.out.printf("XOR V%x = V%x ^ V%x%n", vx, vx, vy); 
+					System.out.printf("XOR V%x = V%x ^ V%x%n", vx, vx, vy); 
 					vReg[vx] ^= vReg[vy];
 					pC += 2;
 
 				} else if (lowCode == 0x04) {
 					
-					//System.out.printf("ADD V%x += V%x%n", vx, vy);
+					System.out.printf("ADD V%x += V%x%n", vx, vy);
 					vReg[vx] = (byte)(vReg[vx] + vReg[vy]);
 					vReg[15] = (vReg[vx] + vReg[vy] > 0xff) ? 0x1 : 0x0;
 					pC += 2;
 
 				} else if (lowCode == 0x05) {
 					
-					//System.out.printf("SUB V%x -= V%x%n", vx, vy);
+					System.out.printf("SUB V%x -= V%x%n", vx, vy);
 					vReg[15] = (vReg[vx] - vReg[vy] < 0x0) ? 0x0 : 0x1;
 					vReg[vx] = (byte)(vReg[vx] - vReg[vy]);
 					pC += 2;
 
 				} else if (lowCode == 0x06) {
 					
-					//System.out.printf("SET V%x = V%x >> 1%n", vx, vy);
+					System.out.printf("SET V%x = V%x >> 1%n", vx, vy);
 					vReg[15] = (vReg[vx] & 1) > 0 ? 0x1 : 0x0;
 					int val = (0x00000000 | vReg[vy]) >> 1;
 					vReg[vx] = (byte) val;
@@ -243,14 +270,14 @@ class Chip8 {
 
 				} else if (lowCode == 0x07) {
 					
-					//System.out.printf("SET V%x = V%x - V%x%n", vx, vy, vx);
+					System.out.printf("SET V%x = V%x - V%x%n", vx, vy, vx);
 					vReg[15] = (vReg[vy] - vReg[vx] < 0x0) ? 0x0 : 0x1;
 					vReg[vx] = (byte)vReg[vy] - vReg[vx];
 					pC += 2;
 				
 				} else if (lowCode == 0x0e) {
 					
-					//System.out.printf("SET V%x = V%x << 1%n", vx, vy);
+					System.out.printf("SET V%x = V%x << 1%n", vx, vy);
 					vReg[15] = ((0xff & vReg[vx]) >> 7) > 0 ? 0x1 : 0x0;
 					vReg[vx]  = (byte) vReg[vy] << 1;
 					pC += 2;
@@ -264,34 +291,34 @@ class Chip8 {
 
 			case 0x09: 
 				
-				//System.out.printf("SKP V%x != V%x%n", vx, vy); 
+				System.out.printf("SKP V%x != V%x%n", vx, vy); 
 				res = ((byte)vReg[vx] != (byte)vReg[vy]) ? 4 : 2;
 				pC += res;
 				break;
 
 			case 0x0a: 
 				
-				//System.out.printf("SET I = &%x%n", address); 
+				System.out.printf("SET I = &%x%n", address); 
 				iReg = address;
 				pC += 2;		
 				break;
 
 			case 0x0b: 
 
-				//System.out.printf("JMP &%x + V0%n", address); 
+				System.out.printf("JMP &%x + V0%n", address); 
 				pC = address + vReg[0];
 				break;
 			
 			case 0x0c: 
 				
-				//System.out.printf("SET V%x = V%x & ?%n", vx, vx); 
+				System.out.printf("SET V%x = V%x & ?%n", vx, vx); 
 				vReg[vx] = new Random().nextInt() & lowByte; 
 				pC += 2;
 				break;
 
 			case 0x0d: 
 				
-				//System.out.printf("DRW %x %x %x%n", vReg[vx], vReg[vy], lowCode); 
+				System.out.printf("DRW %x %x %x%n", vReg[vx], vReg[vy], lowCode); 
 				drawSprite(vReg[vx], vReg[vy], lowCode);
 				pC += 2;
 				break;
@@ -300,11 +327,15 @@ class Chip8 {
 				
 				if (lowByte == 0x9e) {
 
-					System.out.printf("SKP V%x == key%n", vx); 
+					System.out.printf("SKP V%x == key%n", vx);
+					res = ((byte)vReg[vx] == key) ? 4 : 2;
+					pC += res;
 				
 				} else if (lowByte == 0xa1) {
 				
 					System.out.printf("SKP V%x != key%n", vx); 
+					res = ((byte)vReg[vx] != key) ? 4 : 2;
+					pC += res;
 				
 				} else {
 				
@@ -316,35 +347,55 @@ class Chip8 {
 				
 				if (lowByte == 0x07) {
 
-					System.out.printf("SET V%x = delay%n", vx); 
+					System.out.printf("SET V%x = delay%n", vx);
+					vReg[vx] = 0x000 & delayTimer; 
+					pC += 2;
 
 				} else if (lowByte == 0x0a) {
 				
-					System.out.printf("SET V%x = key%n", vx); 
+					System.out.printf("SET V%x = key%n", vx);
+
+					while (true) {
+						
+						if (key == '1') {
+							
+							vReg[vx] = 0x1;
+					
+						} else {
+							
+							break;
+						}
+					}
+
+					pC += 2;
 
 				} else if (lowByte == 0x15) {
 				
 					System.out.printf("SET delay = V%x%n", vx); 
+					delayTimer = (byte) vReg[vx];
+					pC += 2;
 
 				} else if (lowByte == 0x18) {
 					
 					System.out.printf("SET sound = V%x%n", vx); 
+					soundTimer = (byte) vReg[vx];
+					pC += 2;
 				
 				} else if (lowByte == 0x1e) {
 					
-					//System.out.printf("ADD I +=  V%x%n", vx);
-					iReg += vReg[vx];
+					System.out.printf("ADD I +=  V%x (%x)%n", vx, vReg[vx]);
+					iReg +=  0x0ff & vReg[vx];
 					pC += 2;
 				
 				} else if (lowByte == 0x29) {
 				
-					//System.out.printf("SET I = & of V%x%n", vx);
+					System.out.printf("SET I = & of V%x%n", vx);
 					iReg = vReg[vx] * 5;
 					pC += 2;
 
 				} else if (lowByte == 0x33) {
 					
-					//System.out.printf("BCD V%x%n", vx);
+					System.out.printf("BCD V%x%n", vx);
 					int num = 0x000000ff & vReg[vx];
 					int ones = num % 10;
 					int tens = num / 10 % 10;
@@ -356,7 +407,7 @@ class Chip8 {
 				
 				} else if (lowByte == 0x55) {
 					
-					//System.out.printf("DMP V0 - V%x%n", vx);
+					System.out.printf("DMP V0 - V%x%n", vx);
 					
 					for (int i = 0; i <= vx; i++) {
 						
@@ -367,7 +418,7 @@ class Chip8 {
 				
 				} else if (lowByte == 0x65) {
 				
-					//System.out.printf("LOD V0 - V%x%n", vx); 
+					System.out.printf("LOD V0 - V%x%n", vx); 
 					
 					for (int i = 0; i <= vx; i++) {
 						
