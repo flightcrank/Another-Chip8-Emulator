@@ -17,7 +17,9 @@ public class Screen extends JComponent {
 		this.h = 32 * 10;
 		
 		setPreferredSize(new Dimension(w, h));
-		//setDoubleBuffered(true);
+		setDoubleBuffered(true);
+		setFocusable(true);
+		requestFocus();
 	}
 	
 	//set the chip8 emulator intstace so this JComponent can access the screenbuffer portion of system memory to display.
@@ -51,7 +53,6 @@ public class Screen extends JComponent {
 	public void paintComponent(Graphics g) {
 
 		super.paintComponent(g);
-		//Toolkit.getDefaultToolkit().sync(); //smoother animation in linux
 		drawScreenBuffer(g);
 	}
 }

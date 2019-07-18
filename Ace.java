@@ -13,9 +13,12 @@ class Ace {
 	private JPanel panel1;
 	private JMenuBar menuBar1;
 	private JMenu fileMenu;
-	private JMenuItem openRom, quit;
+	private JMenu optionsMenu;
+	private JMenuItem openRom, quit, debug;
 	private Chip8 c8;
-	private int key = 0;
+	private int key = -1;
+
+	private Debugger dbg;
 
 	Timer timer;                //timer to execute opcodes at a constant rate
 	ActionListener taskPerformer;
@@ -24,17 +27,22 @@ class Ace {
 
 		menuBar1 = new JMenuBar();
 		fileMenu = new JMenu("File");
+		optionsMenu = new JMenu("Options");
 		openRom = new JMenuItem("Open Rom");
 		quit = new JMenuItem("Quit");
+		debug = new JMenuItem("Debugger");
 
 		fileMenu.add(openRom);
 		fileMenu.addSeparator();
 		fileMenu.add(quit);
+		optionsMenu.add(debug);
 		menuBar1.add(fileMenu);
+		menuBar1.add(optionsMenu);
 
 		openRom.addActionListener(new OpenAction());
 		quit.addActionListener(new QuitAction());
-		
+		debug.addActionListener(new DebuggerAction());
+
 		//set up the program window frame
 		frame = new JFrame("ACE (Another Chip-8 Emulator)");
 		frame.getContentPane().add(panel1);
@@ -44,7 +52,7 @@ class Ace {
 		frame.setJMenuBar(menuBar1);
 		frame.pack();
 		frame.setVisible(true);
-		frame.addKeyListener(new KeyAction());
+		screen1.addKeyListener(new KeyAction());
 
 		start(fileName);
 	}
@@ -78,16 +86,15 @@ class Ace {
 				Ace emulator = new Ace(args[0]);
 			}
 		});
-
 	}
 
 	public void start(String fileName) {
 
 		c8 = new Chip8();     //set up the chip8 emulator instance
+		c8.loadRom(fileName);            //load the rom into the emulator
 
-		screen1.setInstance(c8);    //let the display JComponent access the chip8 instance
-
-		c8.loadRom(fileName);
+		screen1.setInstance(c8);        //let the display JComponent access the chip8 instance
+		frame.pack();
 
 		taskPerformer = new ActionListener() {
 
@@ -95,11 +102,14 @@ class Ace {
 			public void actionPerformed(ActionEvent evt) {
 
 				if (c8.clock == true) {
-				
+					
+					//while chip8 is running give key board foucs to the screen panel
+					screen1.requestFocus();
+
 					//decrement the sound and delay timers
 					c8.timerCountdown();
-					
-					//run the opcode function multiple times to run aproimate 500hz (8 * 60hz)
+
+					//run the opcode function multiple times to run approximate 500hz (8 * 60hz)
 					c8.runOpcode(key);
 					c8.runOpcode(key);
 					c8.runOpcode(key);
@@ -115,86 +125,97 @@ class Ace {
 				} else {
 
 					//stop chip8 clock from running
-					timer.stop();
+					c8.clock = false;
+					screen1.repaint();
 				}
 			}
 		};
-		
-		//run the chip 8 clock at approx 60hz (60ms / 1000ms)
+
+		//run the chip 8 clock at approx 60hz (1000ms / 60ms)
 		timer = new Timer(16, taskPerformer);
 		timer.start();
-
 	}
-	
+
 	private class KeyAction implements KeyListener {
 
 		public void keyPressed(KeyEvent e) {
 
 			key = e.getKeyCode();
-			
+
 			switch (key) {
-				
-				case KeyEvent.VK_1: key = 0x1; break;
-				case KeyEvent.VK_2: key = 0x2; break;
-				case KeyEvent.VK_3: key = 0x3; break;
-				case KeyEvent.VK_4: key = 0xc; break;
-				case KeyEvent.VK_Q: key = 0x4; break;
-				case KeyEvent.VK_W: key = 0x5; break;
-				case KeyEvent.VK_E: key = 0x6; break;
-				case KeyEvent.VK_R: key = 0xd; break;
-				case KeyEvent.VK_A: key = 0x7; break;
-				case KeyEvent.VK_S: key = 0x8; break;
-				case KeyEvent.VK_D: key = 0x9; break;
-				case KeyEvent.VK_F: key = 0xd; break;
-				case KeyEvent.VK_Z: key = 0xa; break;
-				case KeyEvent.VK_X: key = 0x0; break;
-				case KeyEvent.VK_C: key = 0xb; break;
-				case KeyEvent.VK_V: key = 0xf; break;
-				default: break;
+
+				case KeyEvent.VK_1:key = 0x1;break;
+				case KeyEvent.VK_2:key = 0x2;break;
+				case KeyEvent.VK_3:key = 0x3;break;
+				case KeyEvent.VK_4:key = 0xc;break;
+				case KeyEvent.VK_Q:key = 0x4;break;
+				case KeyEvent.VK_W:key = 0x5;break;
+				case KeyEvent.VK_E:key = 0x6;break;
+				case KeyEvent.VK_R:key = 0xd;break;
+				case KeyEvent.VK_A:key = 0x7;break;
+				case KeyEvent.VK_S:key = 0x8;break;
+				case KeyEvent.VK_D:key = 0x9;break;
+				case KeyEvent.VK_F:key = 0xe;break;
+				case KeyEvent.VK_Z:key = 0xa;break;
+				case KeyEvent.VK_X:key = 0x0;break;
+				case KeyEvent.VK_C:key = 0xb;break;
+				case KeyEvent.VK_V:key = 0xf;break;
+				default:key = -1;break;
 			}
-    		}
-		
+		}
+
+		@Override
 		public void keyReleased(KeyEvent e) {
 
-			//System.out.println("KEY released: " + e);
-			key = 0;
-    		}
-		
+			key = -1;
+		}
+
+		@Override
 		public void keyTyped(KeyEvent e) {
 
-			//System.out.println("KEY typed: " + e);
-    		}
+		}
 	}
-	
+
 	private class QuitAction implements ActionListener {
-		
+
 		@Override
 		public void actionPerformed(ActionEvent e) {
-			
+
 			System.exit(0);
+		}
+	}
+	
+	private class DebuggerAction implements ActionListener {
+
+		@Override
+		public void actionPerformed(ActionEvent e) {
+
+			dbg = new Debugger(c8);
+			panel1.add(dbg, BorderLayout.CENTER);    //add the debugger to the main window
+			frame.pack();
 		}
 	}
 
 	private class OpenAction implements ActionListener {
-		
+
 		@Override
 		public void actionPerformed(ActionEvent e) {
-			
+
 			FileDialog fd = new FileDialog(frame, "Choose a file", FileDialog.LOAD);
 			fd.setVisible(true);
 			String fName = fd.getFile();
-			
+
 			//stop the opcodes from executing
 			timer.stop();
 
 			if (fName != null) {
-				
+
 				System.out.println(fName);
 				c8.initSystem();
 				c8.loadRom(fName);
-		
+
 			} else {
-				
+
 				System.out.println("no file selected");
 			}
 
@@ -218,14 +239,17 @@ class Ace {
 	 */
 	private void $$$setupUI$$$() {
 		panel1 = new JPanel();
-		panel1.setLayout(new GridBagLayout());
+		panel1.setLayout(new BorderLayout(0, 0));
 		panel1.setBorder(BorderFactory.createTitledBorder(BorderFactory.createLineBorder(Color.black), null));
+		final JPanel panel2 = new JPanel();
+		panel2.setLayout(new GridBagLayout());
+		panel1.add(panel2, BorderLayout.NORTH);
 		screen1 = new Screen();
 		GridBagConstraints gbc;
 		gbc = new GridBagConstraints();
 		gbc.gridx = 0;
 		gbc.gridy = 0;
-		panel1.add(screen1, gbc);
+		panel2.add(screen1, gbc);
 	}
 
 	/**
@@ -236,3 +260,4 @@ class Ace {
 	}
 
 }
+	
