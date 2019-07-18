@@ -10,13 +10,12 @@ Things left to implement are
 * sprite screen wrapping
 * rom compatibility
 * sound
-* timer delay
 
 input keys are
-1234
-qwer
-asdf
-zxcv
+	1234
+	qwer
+	asdf
+	zxcv
 
 which map to 0x0 - 0xF
 
